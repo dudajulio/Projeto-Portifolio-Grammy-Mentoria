@@ -1,0 +1,10 @@
+=== RELATÓRIO DE SANEAMENTO DO CSV (RAW -> SILVER) ===
+Arquivo de origem                  : grammy.csv
+Registros reconstruídos do bruto   : 25228 (1709 linhas reparadas)
+Removidos (categorias sem obra)    : 893
+Removidos (duplicatas exatas)      : 0
+Colunas mantidas                   : Year, Ceremony, Award Name, Work, Nominee, Winner, Artista_Principal
+Total final de registros saneados  : 23671
+Vencedores (Winner=True)           : 4535
+Intervalo de edições               : 1958 a 2024
+Arquivo gerado                     : /home/dudajulio/projeto_Grammy/data/silver/grammy_saneado.csv
