@@ -1,5 +1,5 @@
+import altair as alt
 import pandas as pd
-import plotly.express as px
 import streamlit as st
 from db import run_query
 
@@ -9,25 +9,24 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# Paleta temática (Dourado Grammy + Tons Neutros)
-COR_OURO = "#D4AF37"
-COR_SECUNDARIA = "#4A5568"
-COR_DESTAQUE = "#B8860B"
+# Paleta moderna e limpa
+COR_PRIMARIA = "#6366F1"     # Índigo
+COR_SECUNDARIA = "#10B981"   # Esmeralda
+COR_APOIO = "#8B5CF6"        # Roxo suave
 
-# CSS sutil para melhorar espaçamento e cartões de métricas
 st.markdown(
-    """
+    f"""
     <style>
-        .block-container {
+        .block-container {{
             padding-top: 1.8rem;
             padding-bottom: 2rem;
-        }
-        div[data-testid="stMetric"] {
-            background-color: rgba(212, 175, 55, 0.06);
-            border: 1px solid rgba(212, 175, 55, 0.25);
+        }}
+        div[data-testid="stMetric"] {{
+            background-color: rgba(99, 102, 241, 0.05);
+            border: 1px solid rgba(99, 102, 241, 0.22);
             padding: 0.85rem 1rem;
-            border-radius: 0.6rem;
-        }
+            border-radius: 0.65rem;
+        }}
     </style>
     """,
     unsafe_allow_html=True,
@@ -81,26 +80,15 @@ def carregar_filtros():
     return df_cerimonias, df_categorias
 
 
-def estilizar_grafico_barras(fig, titulo_x: str):
-    fig.update_layout(
-        plot_bgcolor="rgba(0,0,0,0)",
-        paper_bgcolor="rgba(0,0,0,0)",
-        xaxis_title=titulo_x,
-        yaxis_title=None,
-        margin=dict(l=10, r=20, t=20, b=20),
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=1.02,
-            xanchor="right",
-            x=1,
-            title=None,
-        ),
-        height=420,
+def grafico_barra_simples(df: pd.DataFrame, x_col: str, y_col: str, x_titulo: str, cor: str, altura: int = 380):
+    base = alt.Chart(df).encode(
+        x=alt.X(f"{x_col}:Q", title=x_titulo),
+        y=alt.Y(f"{y_col}:N", sort="-x", title=None),
+        tooltip=[alt.Tooltip(f"{y_col}:N"), alt.Tooltip(f"{x_col}:Q", format=",")],
     )
-    fig.update_xaxes(showgrid=True, gridcolor="rgba(128,128,128,0.15)")
-    fig.update_yaxes(autorange="reversed")
-    return fig
+    barras = base.mark_bar(cornerRadiusEnd=4, color=cor)
+    rotulos = base.mark_text(align="left", dx=4, color="gray").encode(text=f"{x_col}:Q")
+    return (barras + rotulos).properties(height=altura)
 
 
 # ---------------------------------------------------------
@@ -131,7 +119,7 @@ try:
             [{"Tabela": k, "Registros Armazenados": v} for k, v in contagens.items()]
         ).sort_values("Registros Armazenados", ascending=False)
 
-        col_v1, col_v2 = st.columns([1.2, 1])
+        col_v1, col_v2 = st.columns([1.15, 1])
         with col_v1:
             st.dataframe(
                 df_vol,
@@ -144,18 +132,17 @@ try:
                 },
             )
         with col_v2:
-            fig_vol = px.bar(
-                df_vol,
-                x="Registros Armazenados",
-                y="Tabela",
-                orientation="h",
-                color_discrete_sequence=[COR_OURO],
-                text="Registros Armazenados",
+            st.altair_chart(
+                grafico_barra_simples(
+                    df_vol,
+                    x_col="Registros Armazenados",
+                    y_col="Tabela",
+                    x_titulo="Quantidade de Registros",
+                    cor=COR_PRIMARIA,
+                    altura=360,
+                ),
+                use_container_width=True,
             )
-            fig_vol.update_traces(textposition="outside")
-            fig_vol = estilizar_grafico_barras(fig_vol, "Quantidade de Registros")
-            fig_vol.update_layout(height=360)
-            st.plotly_chart(fig_vol, use_container_width=True)
 
     st.divider()
 
@@ -197,7 +184,6 @@ try:
 
     apenas_vencedores = st.sidebar.toggle("Apenas vencedores", value=False)
 
-    # Monta cláusula WHERE dinâmica
     condicoes = ["1=1"]
 
     if intervalo_anos is not None:
@@ -218,7 +204,6 @@ try:
 
     where_base = " AND ".join(condicoes)
 
-    # Filtro textual aplicado na consulta detalhada e de artistas
     filtro_texto_sql = ""
     if termo_busca:
         busca_esc = termo_busca.replace("'", "''")
@@ -291,25 +276,29 @@ try:
                     {"Vitorias": "Vitórias", "Total_Indicacoes": "Total de Indicações"}
                 )
 
-                fig_art = px.bar(
-                    df_plot,
-                    x="Quantidade",
-                    y="Artista",
-                    color="Métrica",
-                    barmode="group",
-                    orientation="h",
-                    color_discrete_map={
-                        "Vitórias": COR_OURO,
-                        "Total de Indicações": COR_SECUNDARIA,
-                    },
-                    text="Quantidade",
+                chart_art = (
+                    alt.Chart(df_plot)
+                    .mark_bar(cornerRadiusEnd=3)
+                    .encode(
+                        x=alt.X("Quantidade:Q", title="Quantidade"),
+                        y=alt.Y("Artista:N", sort="-x", title=None),
+                        color=alt.Color(
+                            "Métrica:N",
+                            scale=alt.Scale(
+                                domain=["Vitórias", "Total de Indicações"],
+                                range=[COR_SECUNDARIA, COR_PRIMARIA],
+                            ),
+                            legend=alt.Legend(orient="top", title=None),
+                        ),
+                        yOffset="Métrica:N",
+                        tooltip=["Artista:N", "Métrica:N", "Quantidade:Q"],
+                    )
+                    .properties(height=420)
                 )
-                fig_art.update_traces(textposition="outside")
-                fig_art = estilizar_grafico_barras(fig_art, "Quantidade")
-                st.plotly_chart(fig_art, use_container_width=True)
+                st.altair_chart(chart_art, use_container_width=True)
 
             with col_g2:
-                st.subheader("Distribuição por Nacionalidade (Top 10)")
+                st.subheader("Vitórias por Nacionalidade (Top 10)")
                 df_nac = (
                     df_artistas[df_artistas["Nacionalidade"] != "Não informada"]
                     .groupby("Nacionalidade", as_index=False)["Vitorias"]
@@ -318,17 +307,17 @@ try:
                     .head(10)
                 )
                 if not df_nac.empty:
-                    fig_nac = px.bar(
-                        df_nac,
-                        x="Vitorias",
-                        y="Nacionalidade",
-                        orientation="h",
-                        color_discrete_sequence=[COR_DESTAQUE],
-                        text="Vitorias",
+                    st.altair_chart(
+                        grafico_barra_simples(
+                            df_nac,
+                            x_col="Vitorias",
+                            y_col="Nacionalidade",
+                            x_titulo="Total de Vitórias",
+                            cor=COR_APOIO,
+                            altura=420,
+                        ),
+                        use_container_width=True,
                     )
-                    fig_nac.update_traces(textposition="outside")
-                    fig_nac = estilizar_grafico_barras(fig_nac, "Total de Vitórias")
-                    st.plotly_chart(fig_nac, use_container_width=True)
                 else:
                     st.caption("Sem dados de nacionalidade preenchidos para este recorte.")
 
@@ -375,18 +364,17 @@ try:
                 """
             )
             if not df_gravadoras.empty:
-                fig_grav = px.bar(
-                    df_gravadoras.head(10),
-                    x="Vitorias",
-                    y="Gravadora",
-                    orientation="h",
-                    color_discrete_sequence=[COR_OURO],
-                    text="Vitorias",
+                st.altair_chart(
+                    grafico_barra_simples(
+                        df_gravadoras.head(10),
+                        x_col="Vitorias",
+                        y_col="Gravadora",
+                        x_titulo="Vitórias",
+                        cor=COR_SECUNDARIA,
+                        altura=350,
+                    ),
+                    use_container_width=True,
                 )
-                fig_grav.update_traces(textposition="outside")
-                fig_grav = estilizar_grafico_barras(fig_grav, "Vitórias")
-                fig_grav.update_layout(height=350)
-                st.plotly_chart(fig_grav, use_container_width=True)
 
             st.dataframe(
                 df_gravadoras,
@@ -417,18 +405,17 @@ try:
                 """
             )
             if not df_generos.empty:
-                fig_gen = px.bar(
-                    df_generos.head(10),
-                    x="Indicacoes",
-                    y="Genero",
-                    orientation="h",
-                    color_discrete_sequence=[COR_SECUNDARIA],
-                    text="Indicacoes",
+                st.altair_chart(
+                    grafico_barra_simples(
+                        df_generos.head(10),
+                        x_col="Indicacoes",
+                        y_col="Genero",
+                        x_titulo="Indicações",
+                        cor=COR_PRIMARIA,
+                        altura=350,
+                    ),
+                    use_container_width=True,
                 )
-                fig_gen.update_traces(textposition="outside")
-                fig_gen = estilizar_grafico_barras(fig_gen, "Indicações")
-                fig_gen.update_layout(height=350)
-                st.plotly_chart(fig_gen, use_container_width=True)
 
             st.dataframe(
                 df_generos,
@@ -477,7 +464,7 @@ try:
 
     # === ABA 3: EVOLUÇÃO HISTÓRICA ===
     with aba_evolucao:
-        st.subheader("Evolução de Indicações e Categorias por Ano")
+        st.subheader("Evolução de Indicações por Ano")
         df_hist = run_query(
             f"""
             SELECT
@@ -498,22 +485,27 @@ try:
         if df_hist.empty:
             st.info("Sem dados históricos para exibir com os filtros selecionados.")
         else:
-            fig_hist = px.area(
-                df_hist,
-                x="Ano",
-                y="Total_Indicacoes",
-                markers=True,
-                color_discrete_sequence=[COR_OURO],
-                labels={"Total_Indicacoes": "Total de Indicações", "Ano": "Ano"},
+            area = (
+                alt.Chart(df_hist)
+                .mark_area(
+                    line={"color": COR_PRIMARIA, "strokeWidth": 2.5},
+                    color=alt.Gradient(
+                        gradient="linear",
+                        stops=[
+                            alt.GradientStop(color="rgba(99, 102, 241, 0.35)", offset=0),
+                            alt.GradientStop(color="rgba(99, 102, 241, 0.02)", offset=1),
+                        ],
+                        x1=1, x2=1, y1=1, y2=0,
+                    ),
+                )
+                .encode(
+                    x=alt.X("Ano:O", title="Ano"),
+                    y=alt.Y("Total_Indicacoes:Q", title="Total de Indicações"),
+                    tooltip=["Ano:O", "Edicao:Q", "Total_Indicacoes:Q", "Total_Vencedores:Q"],
+                )
+                .properties(height=380)
             )
-            fig_hist.update_layout(
-                plot_bgcolor="rgba(0,0,0,0)",
-                paper_bgcolor="rgba(0,0,0,0)",
-                height=380,
-                margin=dict(l=10, r=20, t=20, b=20),
-            )
-            fig_hist.update_yaxes(showgrid=True, gridcolor="rgba(128,128,128,0.15)")
-            st.plotly_chart(fig_hist, use_container_width=True)
+            st.altair_chart(area, use_container_width=True)
 
             st.dataframe(
                 df_hist.sort_values("Ano", ascending=False),
