@@ -4,4 +4,4 @@ pymysql
 cryptography
 pandas
 requests
-plotly
+altair
